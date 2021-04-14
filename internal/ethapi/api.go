@@ -1160,7 +1160,7 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 		result   *core.ExecutionResult
 		err      error
 		resList2 []map[string]interface{}
-		balances []*big.Int
+		balances []*hexutil.Big
 	)
 
 	res := map[string]interface{}{}
@@ -1231,7 +1231,7 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 	}
 
 	if len(addresses) > 0 {
-		balances = make([]*big.Int, len(addresses))
+		balances = make([]*hexutil.Big, len(addresses))
 
 		if callctx == nil {
 			state, header, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
@@ -1276,7 +1276,7 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 		}
 
 		for idx, address := range addresses {
-			balances[idx] = callctx.state.GetBalance(address)
+			balances[idx] = (*hexutil.Big)(callctx.state.GetBalance(address))
 		}
 		res["balances"] = balances
 	}
@@ -1378,9 +1378,9 @@ func (s *PublicBlockChainAPI) PendingBlockLogs(ctx context.Context, addresses []
 		myTxs[len(myTxs)-1].Logs = append(myTxs[len(myTxs)-1].Logs, tempTxLog.Log)
 	}
 
-	balances := make([]*big.Int, len(addresses))
+	balances := make([]*hexutil.Big, len(addresses))
 	for idx, address := range addresses {
-		balances[idx] = state.GetBalance(address)
+		balances[idx] = (*hexutil.Big)(state.GetBalance(address))
 	}
 
 	fields := map[string]interface{}{
