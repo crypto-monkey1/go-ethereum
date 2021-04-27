@@ -1180,7 +1180,7 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 				callctxcopy = callctx.copy()
 			}
 			tx := new(types.Transaction)
-			if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+			if err := tx.UnmarshalBinary(encodedTx); err != nil {
 				return nil, err
 			}
 			var msg *types.Message
