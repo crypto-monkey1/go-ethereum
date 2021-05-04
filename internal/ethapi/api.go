@@ -1153,7 +1153,7 @@ type MyLog struct {
 	Index uint `json:"logIndex"`
 }
 
-func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexutil.Bytes, blockNrOrHash rpc.BlockNumberOrHash, addresses []common.Address, overrides *map[common.Address]account) (map[string]interface{}, error) {
+func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexutil.Bytes, argsList []CallArgs, blockNrOrHash rpc.BlockNumberOrHash, addresses []common.Address, overrides *map[common.Address]account) (map[string]interface{}, error) {
 	var accounts map[common.Address]account
 	if overrides != nil {
 		accounts = *overrides
@@ -1169,10 +1169,11 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 
 	res := map[string]interface{}{}
 
+	resList2 = make([]map[string]interface{}, len(encodedTxList)+len(argsList))
 	// resList := make(map[int]*returnCallList, len(encodedTxList))
 	if len(encodedTxList) > 0 {
 		logsStartIndex := 0
-		resList2 = make([]map[string]interface{}, len(encodedTxList))
+
 		for idx, encodedTx := range encodedTxList {
 
 			var callctxcopy *callContext
@@ -1230,6 +1231,67 @@ func (s *PublicBlockChainAPI) CallList(ctx context.Context, encodedTxList []hexu
 			}
 
 			resList2[idx] = fields
+		}
+		res["receipts"] = resList2
+	}
+
+	if len(argsList) > 0 {
+		logsStartIndex := 0
+
+		for idx, args := range argsList {
+
+			var callctxcopy *callContext
+			if callctx != nil {
+				callctxcopy = callctx.copy()
+			}
+
+			// var msg *types.Message
+
+			result, callctx, err = DoCall3(ctx, s.b, args, callctxcopy, blockNrOrHash, accounts, vm.Config{}, 0, s.b.RPCGasCap())
+			if err != nil {
+				return nil, err
+			}
+
+			logs := callctx.state.Logs()
+			thisTxLogs := logs[logsStartIndex:]
+
+			thisTxMyLogs := make([]MyLog, len(thisTxLogs))
+			for i, log := range thisTxLogs {
+
+				thisTxMyLogs[i] = MyLog{
+					Address: log.Address,
+					Topics:  log.Topics,
+					Data:    hexutil.Bytes(log.Data),
+					Index:   log.Index,
+				}
+			}
+			logsStartIndex = len(logs)
+			fields := map[string]interface{}{
+				// "transactionHash":  tx.Hash(),
+				"transactionIndex": idx,
+				"gasUsed":          result.UsedGas,
+				// "gasPrice":         tx.GasPrice(),
+				// "from": msg.From(),
+				// "to":               tx.To(),
+				// "gasLimit": msg.Gas(),
+				// "minGasLimit":      tx.Gas(), // not sure this is min...
+				// "nonce":            tx.Nonce(),
+				// "value":            tx.Value(),
+				"logs": thisTxMyLogs,
+				// "input":            hexutil.Bytes(tx.Data()),
+			}
+
+			if len(result.Revert()) > 0 {
+				fields["revert"] = newRevertError(result).error.Error()
+			} else {
+				fields["return"] = hexutil.Bytes(result.Return())
+			}
+
+			if result.Err != nil {
+				fields["error"] = result.Err.Error()
+			}
+
+			resList2[idx+len(encodedTxList)] = fields
 		}
 		res["receipts"] = resList2
 	}
